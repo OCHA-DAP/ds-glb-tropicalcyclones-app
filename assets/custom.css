@@ -1,3 +1,32 @@
 .loading_wrapper > div {
     visibility: visible !important;
 }
+
+[class*="primary"] {
+    color: #fff;
+    background-color: #1bb580ff!important;
+    accent-color: #1bb580ff;
+    margin: 0.2rem;
+}
+
+.rc-slider-track {
+  background-color: #1bb580ff;
+}
+
+.rc-slider-dot-active {
+  border-color: #1bb580ff;
+  border: solid 2px #1bb580ff;
+}
+
+.rc-slider-handle {
+  background-color: #1bb580ff;
+  border-color: #1bb580ff;
+}
+
+.rc-slider-handle:hover {
+  border-color: #1bb580ff;
+}
+
+.rc-slider-handle-active:active {
+  border-color: #1bb580ff;
+}
