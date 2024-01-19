@@ -2,8 +2,8 @@ import os
 import shutil
 from pathlib import Path
 
-OLD_DATA_DIR = Path(os.getenv("AA_DATA_DIR"))
-DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW"))
+OLD_DATA_DIR = Path(os.getenv("AA_DATA_DIR", "default"))
+DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW", "default"))
 IBRACS_PROC_DIR = DATA_DIR / "public" / "processed" / "glb" / "ibtracs"
 IBRACS_THRESH_PATH = IBRACS_PROC_DIR / "all_adm0_thresholds.parquet"
 IBRACS_WMO_PATH = IBRACS_PROC_DIR / "ibtracs_with_wmo_wind.parquet"
