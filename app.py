@@ -1,6 +1,7 @@
 import dash_bootstrap_components as dbc
 import geopandas as gpd
 import pandas as pd
+import plotly.express as px
 from dash import Dash, Input, Output, dash_table, dcc, html
 
 from migrate_data import APP_DATA_DIR
@@ -116,6 +117,7 @@ return_period_display = html.Div(
     [
         html.H3("Return period:"),
         html.H1(id="return-period"),
+        html.Label(id="return-period-description"),
     ]
 )
 
@@ -128,6 +130,12 @@ trigger_cyclones_display = html.Div(
             style_cell={"textAlign": "left"},
             style_as_list_view=True,
         ),
+    ]
+)
+
+cyclone_tracks_display = html.Div(
+    [
+        dcc.Graph(id="cyclone-tracks-graph", style={"height": "600px"}),
     ]
 )
 
@@ -156,42 +164,89 @@ app.layout = html.Div(
                                 ),
                             ],
                             width=4,
-                        )
+                        ),
+                        dbc.Col(
+                            [
+                                dbc.Row(cyclone_tracks_display),
+                            ],
+                            width=8,
+                        ),
                     ],
                     className="mt-4",
                 ),
             ],
             style={"marginTop": "70px"},
         ),
+        dcc.Store(id="adm0-cyclones"),
     ]
 )
 
 
 @app.callback(
-    Output("return-period", "children"),
-    Output("triggered-table", "data"),
+    Output("adm0-cyclones", "data"),
     Input("adm0-input", "value"),
     Input("speed-input", "value"),
     Input("distance-input", "value"),
     Input("year-input", "value"),
 )
-def update_return_period(adm0, speed, distance, year):
-    print(adm0)
+def update_selected_cyclones(adm0, speed, distance, year):
     df_country = thresholds[
         (thresholds["asap0_id"] == int(adm0)) & (thresholds["year"] >= int(year))
-    ]
+    ].copy()
+    df_country["triggered"] = (df_country["s_thresh"] == speed) & (
+        df_country["d_thresh"] == distance
+    )
+    return df_country.to_dict("records")
+
+
+@app.callback(
+    Output("return-period", "children"),
+    Output("return-period-description", "children"),
+    Output("triggered-table", "data"),
+    Input("adm0-cyclones", "data"),
+)
+def update_return_period(data):
+    df_country = pd.DataFrame(data)
+    if df_country.empty:
+        return "No cyclones triggered", "No cyclones in range", []
+    df_triggered = df_country[df_country["triggered"]]
     n_years = df_country["year"].nunique()
-    df_triggered = df_country[
-        (df_country["s_thresh"] == speed) & (df_country["d_thresh"] == distance)
-    ]
-    df_triggered = df_triggered.sort_values("year", ascending=False)
+    min_year = df_country["year"].min()
     df_dict = df_triggered.to_dict("records")
-    print(df_dict)
+    description = f"out of {n_years} years, since {min_year}"
     if df_triggered.empty:
-        return "No cyclones triggered", df_dict
+        return "No cyclones triggered", description, df_dict
     else:
         rp = n_years / len(df_triggered)
-        return f"{rp:.1f} years", df_dict
+        return f"{rp:.1f} years", description, df_dict
+
+
+@app.callback(
+    Output("cyclone-tracks-graph", "figure"),
+    # Input("adm0-cyclones", "data"),
+    Input("adm0-input", "value"),
+)
+def update_cyclone_tracks(adm0):
+    # df_country = pd.DataFrame(data)
+    codab = adm0s[adm0s["asap0_id"] == int(adm0)]
+    fig = px.choropleth_mapbox(
+        codab,
+        geojson=codab.geometry,
+        locations=codab.index,
+        mapbox_style="open-street-map",
+        zoom=3,
+        center={"lat": 0, "lon": 0},
+        opacity=0.5,
+    )
+
+    fig.update_layout(
+        mapbox_style="open-street-map",
+        autosize=True,
+        hovermode="closest",
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+    )
+    return fig
 
 
 if __name__ == "__main__":
