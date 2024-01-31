@@ -2,9 +2,11 @@ import dash_bootstrap_components as dbc
 import geopandas as gpd
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from dash import Dash, Input, Output, dash_table, dcc, html
 
 from migrate_data import APP_DATA_DIR
+from utils import calc_plotly_zoom
 
 thresholds = pd.read_parquet(APP_DATA_DIR / "all_adm0_thresholds.parquet")
 tracks = pd.read_parquet(APP_DATA_DIR / "ibtracs_with_wmo_wind.parquet")
@@ -116,7 +118,7 @@ year_input = dbc.InputGroup(
 return_period_display = html.Div(
     [
         html.H3("Return period:"),
-        html.H1(id="return-period"),
+        dcc.Loading(html.H1(id="return-period")),
         html.Label(id="return-period-description"),
     ]
 )
@@ -135,7 +137,7 @@ trigger_cyclones_display = html.Div(
 
 cyclone_tracks_display = html.Div(
     [
-        dcc.Graph(id="cyclone-tracks-graph", style={"height": "600px"}),
+        dcc.Graph(id="cyclone-tracks-graph", style={"height": "700px"}),
     ]
 )
 
@@ -178,25 +180,31 @@ app.layout = html.Div(
             style={"marginTop": "70px"},
         ),
         dcc.Store(id="adm0-cyclones"),
+        dcc.Store(id="triggered-cyclone-tracks"),
     ]
 )
 
 
 @app.callback(
     Output("adm0-cyclones", "data"),
+    Output("triggered-cyclone-tracks", "data"),
     Input("adm0-input", "value"),
     Input("speed-input", "value"),
     Input("distance-input", "value"),
     Input("year-input", "value"),
 )
 def update_selected_cyclones(adm0, speed, distance, year):
-    df_country = thresholds[
+    country_cyclones = thresholds[
         (thresholds["asap0_id"] == int(adm0)) & (thresholds["year"] >= int(year))
     ].copy()
-    df_country["triggered"] = (df_country["s_thresh"] == speed) & (
-        df_country["d_thresh"] == distance
+    country_cyclones["triggered"] = (country_cyclones["s_thresh"] == speed) & (
+        country_cyclones["d_thresh"] == distance
     )
-    return df_country.to_dict("records")
+    country_cyclones = country_cyclones.sort_values("year", ascending=False)
+    triggered_tracks = tracks[
+        tracks["sid"].isin(country_cyclones[country_cyclones["triggered"]]["sid"])
+    ]
+    return country_cyclones.to_dict("records"), triggered_tracks.to_dict("records")
 
 
 @app.callback(
@@ -210,10 +218,10 @@ def update_return_period(data):
     if df_country.empty:
         return "No cyclones triggered", "No cyclones in range", []
     df_triggered = df_country[df_country["triggered"]]
-    n_years = df_country["year"].nunique()
+    n_years = df_country["year"].max() - df_country["year"].min() + 1
     min_year = df_country["year"].min()
     df_dict = df_triggered.to_dict("records")
-    description = f"out of {n_years} years, since {min_year}"
+    description = f"based on {n_years} years with cyclone data, since {min_year}"
     if df_triggered.empty:
         return "No cyclones triggered", description, df_dict
     else:
@@ -223,22 +231,44 @@ def update_return_period(data):
 
 @app.callback(
     Output("cyclone-tracks-graph", "figure"),
-    # Input("adm0-cyclones", "data"),
+    Input("triggered-cyclone-tracks", "data"),
     Input("adm0-input", "value"),
 )
-def update_cyclone_tracks(adm0):
-    # df_country = pd.DataFrame(data)
+def update_cyclone_tracks(data, adm0):
+    triggered_tracks = pd.DataFrame(data)
     codab = adm0s[adm0s["asap0_id"] == int(adm0)]
+    lon_min, lat_min, lon_max, lat_max = codab.geometry.total_bounds
+    min_zoom = calc_plotly_zoom(lon_min, lat_min, lon_max, lat_max)
+    zoom = min(min_zoom, 5)
     fig = px.choropleth_mapbox(
         codab,
         geojson=codab.geometry,
         locations=codab.index,
         mapbox_style="open-street-map",
-        zoom=3,
-        center={"lat": 0, "lon": 0},
+        zoom=zoom,
+        center={"lat": (lat_max + lat_min) / 2, "lon": (lon_max + lon_min) / 2},
         opacity=0.5,
     )
-
+    if triggered_tracks.empty:
+        return fig
+    triggered_tracks["time"] = pd.to_datetime(triggered_tracks["time"])
+    for sid in triggered_tracks["sid"].unique():
+        track = triggered_tracks[triggered_tracks["sid"] == sid]
+        year = track["time"].dt.year.iloc[0]
+        fig.add_trace(
+            go.Scattermapbox(
+                lat=track["lat"],
+                lon=track["lon"],
+                mode="lines+markers",
+                name=f"{track['name'].iloc[0]}<br>{year}",
+                hoverinfo="skip",
+                customdata=track[["wmo_wind", "time"]],
+                hovertemplate=(
+                    "Wind speed: %{customdata[0]} knots<br>"
+                    "Date: %{customdata[1]}<br>"
+                ),
+            )
+        )
     fig.update_layout(
         mapbox_style="open-street-map",
         autosize=True,
