@@ -70,7 +70,7 @@ adm0_input = dbc.InputGroup(
 
 speed_input = html.Div(
     [
-        html.Label("Maximum sustained wind speed (knots)"),
+        html.Label("Maximum 1-min sustained wind speed (knots)"),
         dcc.Slider(
             id="speed-input",
             min=0,
