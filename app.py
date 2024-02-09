@@ -42,6 +42,17 @@ navbar = dbc.NavbarSimple(
     dark=True,
 )
 
+disclaimer = dbc.Alert(
+    [
+        "This is an internal tool under development. "
+        "For any enquires please contact the OCHA Centre for Humanitarian "
+        "Data via Tristan Downing at ",
+        html.A("tristan.downing@un.org", href="mailto:tristan.downing@un.org"),
+        ".",
+    ],
+    color="danger",
+)
+
 intro_text = """
 When determining the return period of tropical cyclones for a certain country,
 an important factor is the maximum sustained wind speed of the cyclone while
@@ -50,6 +61,72 @@ combinations of maximum sustained wind speed and distance to determine which
 cyclones in the past would have met these conditions, and therefore the return
 period.
 """
+
+data_sources = html.Div(
+    [
+        html.H6("Data sources"),
+        html.P(
+            [
+                "Cyclone track data is from the ",
+                html.A(
+                    "IBTrACS",
+                    href="https://www.ncei.noaa.gov/products/international-best-track-archive",
+                    target="_blank",
+                ),
+                " dataset. Administrative boundaries are from the ",
+                html.A(
+                    "GAUL",
+                    href="https://data.apps.fao.org/map/catalog/static/search?keyword=HiH_boundaries",
+                    target="_blank",
+                ),
+                " dataset.",
+            ],
+        ),
+    ],
+    style={"color": "grey", "font-size": "0.8rem"},
+)
+
+methodology = html.Div(
+    [
+        html.H6("Methodology"),
+        html.P(
+            [
+                "Distances are calculated using the ",
+                html.I("EPSG:3857"),
+                " projection. Distances are calculated only from the points "
+                "reported in IBTrACS, not the interpolated path. This can "
+                "result in overestimating the distance, particularly for "
+                "small countries, and when the cyclone is relatively close.",
+            ],
+        ),
+    ],
+    style={"color": "grey", "font-size": "0.8rem"},
+)
+
+code_references = html.Div(
+    [
+        html.H6("Code"),
+        html.P(
+            [
+                "The code used to calculate the distances is available on GitHub ",
+                html.A(
+                    "here",
+                    href="https://github.com/OCHA-DAP/ds-glb-tropicalcyclones",
+                    target="_blank",
+                ),
+                ". The code used to calculate the return period and run this app is "
+                "available on GitHub ",
+                html.A(
+                    "here",
+                    href="https://github.com/OCHA-DAP/ds-glb-tropicalcyclones-app",
+                    target="_blank",
+                ),
+                ".",
+            ],
+        ),
+    ],
+    style={"color": "grey", "font-size": "0.8rem"},
+)
 
 adm0_input = dbc.InputGroup(
     [
@@ -146,7 +223,8 @@ app.layout = html.Div(
         navbar,
         dbc.Container(
             children=[
-                dbc.Row([dbc.Col([html.P(intro_text)])], className="mt-4"),
+                dbc.Row([dbc.Col([disclaimer])], className="mt-4"),
+                dbc.Row([dbc.Col([html.P(intro_text)])]),
                 dbc.Row(
                     children=[
                         dbc.Col(adm0_input, width=2),
@@ -176,8 +254,12 @@ app.layout = html.Div(
                     ],
                     className="mt-4",
                 ),
+                dbc.Row(
+                    [dbc.Col([data_sources, methodology, code_references])],
+                    className="mt-4",
+                ),
             ],
-            style={"marginTop": "70px"},
+            style={"marginTop": "80px"},
         ),
         dcc.Store(id="adm0-cyclones"),
         dcc.Store(id="triggered-cyclone-tracks"),
