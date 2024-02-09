@@ -31,6 +31,8 @@ cyclones = cyclones.reset_index()
 print_memory_usage()
 print("thresholds")
 thresholds = thresholds.merge(cyclones[["sid", "year", "name"]], on="sid")
+print("thresholds dtypes:")
+print(thresholds.dtypes)
 
 print_memory_usage()
 print("Setting up app...")
@@ -50,7 +52,7 @@ navbar = dbc.NavbarSimple(
             className="ml-2",
         ),
     ],
-    style={"height": "60px"},
+    style={"height": "60px", "margin": "0px"},
     brand="Tropical Cyclones Return Period Analysis",
     fixed="top",
     color="primary",
