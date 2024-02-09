@@ -167,11 +167,11 @@ speed_input = html.Div(
         html.Label("Maximum 1-min sustained wind speed (knots)"),
         dcc.Slider(
             id="speed-input",
-            min=0,
+            min=30,
             max=185,
             step=5,
             value=100,
-            marks={i: f"{i}" for i in range(0, 186, 50)},
+            marks={i: f"{i}" for i in range(30, 186, 50)},
             tooltip={"placement": "bottom", "always_visible": True},
         ),
     ]
@@ -183,10 +183,10 @@ distance_input = html.Div(
         dcc.Slider(
             id="distance-input",
             min=0,
-            max=500,
+            max=400,
             step=10,
             value=250,
-            marks={i: f"{i}" for i in range(0, 501, 100)},
+            marks={i: f"{i}" for i in range(0, 401, 100)},
             tooltip={"placement": "bottom", "always_visible": True},
         ),
     ]
