@@ -6,19 +6,34 @@ import plotly.graph_objects as go
 from dash import Dash, Input, Output, dash_table, dcc, html
 
 from migrate_data import APP_DATA_DIR
-from utils import calc_plotly_zoom
+from utils import calc_plotly_zoom, print_memory_usage
 
+print_memory_usage()
+print("Loading data...")
+print("thresholds")
 thresholds = pd.read_parquet(APP_DATA_DIR / "all_adm0_thresholds.parquet")
+print_memory_usage()
+print("tracks")
 tracks = pd.read_parquet(APP_DATA_DIR / "ibtracs_with_wmo_wind.parquet")
+print_memory_usage()
+print("adm0s")
 adm0s = gpd.read_file(APP_DATA_DIR / "gaul0_asap_v04" / "gaul0_asap.shp")
+print_memory_usage()
 adm0s = adm0s.sort_values("name0")
 
+print("Processing data...")
+print("cyclones")
 cyclones = tracks.groupby("sid").first()
 cyclones["year"] = cyclones["time"].dt.year
 cyclones["name"] = cyclones["name"].str.title()
 cyclones = cyclones.reset_index()
 
+print_memory_usage()
+print("thresholds")
 thresholds = thresholds.merge(cyclones[["sid", "year", "name"]], on="sid")
+
+print_memory_usage()
+print("Setting up app...")
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.title = "Tropical Cyclones Return Period"
@@ -266,6 +281,8 @@ app.layout = html.Div(
     ]
 )
 
+print_memory_usage()
+
 
 @app.callback(
     Output("adm0-cyclones", "data"),
@@ -276,6 +293,7 @@ app.layout = html.Div(
     Input("year-input", "value"),
 )
 def update_selected_cyclones(adm0, speed, distance, year):
+    print("Updating selected cyclones...")
     country_cyclones = thresholds[
         (thresholds["asap0_id"] == int(adm0)) & (thresholds["year"] >= int(year))
     ].copy()
@@ -286,6 +304,7 @@ def update_selected_cyclones(adm0, speed, distance, year):
     triggered_tracks = tracks[
         tracks["sid"].isin(country_cyclones[country_cyclones["triggered"]]["sid"])
     ]
+    print_memory_usage()
     return country_cyclones.to_dict("records"), triggered_tracks.to_dict("records")
 
 
@@ -296,6 +315,7 @@ def update_selected_cyclones(adm0, speed, distance, year):
     Input("adm0-cyclones", "data"),
 )
 def update_return_period(data):
+    print("Updating return period...")
     df_country = pd.DataFrame(data)
     if df_country.empty:
         return "No cyclones triggered", "No cyclones in range", []
@@ -304,6 +324,7 @@ def update_return_period(data):
     min_year = df_country["year"].min()
     df_dict = df_triggered.to_dict("records")
     description = f"based on {n_years} years with cyclone data, since {min_year}"
+    print_memory_usage()
     if df_triggered.empty:
         return "No cyclones triggered", description, df_dict
     else:
@@ -317,6 +338,7 @@ def update_return_period(data):
     Input("adm0-input", "value"),
 )
 def update_cyclone_tracks(data, adm0):
+    print("Updating cyclone tracks...")
     triggered_tracks = pd.DataFrame(data)
     codab = adm0s[adm0s["asap0_id"] == int(adm0)]
     lon_min, lat_min, lon_max, lat_max = codab.geometry.total_bounds
@@ -358,6 +380,7 @@ def update_cyclone_tracks(data, adm0):
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
     )
+    print_memory_usage()
     return fig
 
 

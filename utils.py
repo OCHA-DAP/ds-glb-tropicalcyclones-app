@@ -1,4 +1,7 @@
+import os
+
 import numpy as np
+import psutil
 
 
 def calc_plotly_zoom(lon_min, lat_min, lon_max, lat_max) -> float:
@@ -35,3 +38,22 @@ def calc_plotly_zoom(lon_min, lat_min, lon_max, lat_max) -> float:
     lat_zoom = np.interp(height, lon_zoom_range, range(20, 0, -1))
     zoom = round(min(lon_zoom, lat_zoom), 2)
     return zoom
+
+
+def get_memory_usage() -> float:
+    """Get the memory usage of the current process in MB"""
+    # Get the current process ID
+    pid = os.getpid()
+    # Get the Process object
+    process = psutil.Process(pid)
+    # Get the memory info
+    mem_info = process.memory_info()
+    # Calculate the memory usage in MB
+    memory_usage = mem_info.rss / 1024 / 1024
+    return memory_usage
+
+
+def print_memory_usage() -> None:
+    """Print the memory usage of the current process in MB"""
+    memory_usage = get_memory_usage()
+    print(f"Memory usage: {memory_usage:.2f} MB")
