@@ -1,10 +1,12 @@
+import json
+
 import dash_bootstrap_components as dbc
 import geopandas as gpd
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, dash_table, dcc, html
+from dash import Dash, Input, Output, dcc, html
 
+from constants import CHD_GREEN
 from migrate_data import APP_DATA_DIR
 from utils import calc_plotly_zoom, print_memory_usage
 
@@ -33,6 +35,8 @@ print("thresholds")
 thresholds = thresholds.merge(cyclones[["sid", "year", "name"]], on="sid")
 print("thresholds dtypes:")
 print(thresholds.dtypes)
+
+adm0s = adm0s[adm0s["asap0_id"].isin(thresholds["asap0_id"].unique())]
 
 print_memory_usage()
 print("Setting up app...")
@@ -143,6 +147,13 @@ methodology = html.Div(
                 ".",
             ]
         ),
+        html.P(
+            [
+                "Cyclone track data only goes up to 2022, inclusive. More "
+                "recent tracks will be added once the WMO endorses the best "
+                "track data and it is updated in IBTrACS."
+            ]
+        ),
     ],
     style={"color": "grey", "font-size": "0.8rem"},
 )
@@ -244,22 +255,29 @@ return_period_display = html.Div(
     ]
 )
 
-trigger_cyclones_display = html.Div(
-    [
-        html.H3("Triggered cyclones:"),
-        dash_table.DataTable(
-            id="triggered-table",
-            columns=[{"name": x.capitalize(), "id": x} for x in ["name", "year"]],
-            style_cell={"textAlign": "left"},
-            style_as_list_view=True,
-        ),
-    ]
-)
+# trigger_cyclones_display = html.Div(
+#     [
+#         html.H3("Triggered cyclones:"),
+#         dash_table.DataTable(
+#             id="triggered-table",
+#             columns=[{"name": x.capitalize(), "id": x} for x in ["name", "year"]],
+#             style_cell={"textAlign": "left"},
+#             style_as_list_view=True,
+#         ),
+#     ]
+# )
 
 cyclone_tracks_display = html.Div(
     [
-        dcc.Graph(id="cyclone-tracks-graph", style={"height": "700px"}),
-    ]
+        dcc.Loading(
+            dcc.Graph(
+                id="cyclone-tracks-graph",
+                style={"height": "700px"},
+                config={"displayModeBar": False},
+            ),
+            parent_className="loading_wrapper",
+        )
+    ],
 )
 
 app.layout = html.Div(
@@ -283,17 +301,17 @@ app.layout = html.Div(
                         dbc.Col(
                             [
                                 dbc.Row(dbc.Col(return_period_display)),
-                                dbc.Row(
-                                    dbc.Col(trigger_cyclones_display), className="mt-4"
-                                ),
+                                # dbc.Row(
+                                #     dbc.Col(trigger_cyclones_display), className="mt-4",
+                                # ),
                             ],
-                            width=4,
+                            width=2,
                         ),
                         dbc.Col(
                             [
                                 dbc.Row(cyclone_tracks_display),
                             ],
-                            width=8,
+                            width=10,
                         ),
                     ],
                     className="mt-4",
@@ -340,7 +358,7 @@ def update_selected_cyclones(adm0, speed, distance, year):
 @app.callback(
     Output("return-period", "children"),
     Output("return-period-description", "children"),
-    Output("triggered-table", "data"),
+    # Output("triggered-table", "data"),
     Input("adm0-cyclones", "data"),
 )
 def update_return_period(data):
@@ -351,14 +369,14 @@ def update_return_period(data):
     df_triggered = df_country[df_country["triggered"]]
     n_years = df_country["year"].max() - df_country["year"].min() + 1
     min_year = df_country["year"].min()
-    df_dict = df_triggered.to_dict("records")
+    # df_dict = df_triggered.to_dict("records")
     description = f"based on {n_years} years with cyclone data, since {min_year}"
     print_memory_usage()
     if df_triggered.empty:
-        return "No cyclones triggered", description, df_dict
+        return "No cyclones triggered", description  # , df_dict
     else:
         rp = n_years / len(df_triggered)
-        return f"{rp:.1f} years", description, df_dict
+        return f"{rp:.1f} years", description  # , df_dict
 
 
 @app.callback(
@@ -373,25 +391,33 @@ def update_cyclone_tracks(data, adm0):
     lon_min, lat_min, lon_max, lat_max = codab.geometry.total_bounds
     min_zoom = calc_plotly_zoom(lon_min, lat_min, lon_max, lat_max)
     zoom = min(min_zoom, 5)
-    fig = px.choropleth_mapbox(
-        codab,
-        geojson=codab.geometry,
-        locations=codab.index,
-        mapbox_style="open-street-map",
-        zoom=zoom,
-        center={"lat": (lat_max + lat_min) / 2, "lon": (lon_max + lon_min) / 2},
-        opacity=0.5,
+    fig = go.Figure()
+    colorscale = [[0, CHD_GREEN], [1, CHD_GREEN]]
+    fig.add_trace(
+        go.Choroplethmapbox(
+            geojson=json.loads(codab.geometry.to_json()),
+            locations=codab.index,
+            z=[1],
+            hoverinfo="text",
+            text=codab["name0"],
+            showscale=False,
+            colorscale=colorscale,
+            marker_opacity=0.5,
+        )
     )
     fig.update_layout(
         mapbox_style="open-street-map",
         autosize=True,
         hovermode="closest",
-        showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
+        mapbox_zoom=zoom,
+        mapbox_center_lat=(lat_max + lat_min) / 2,
+        mapbox_center_lon=(lon_max + lon_min) / 2,
     )
     if triggered_tracks.empty:
         return fig
     triggered_tracks["time"] = pd.to_datetime(triggered_tracks["time"])
+    triggered_tracks = triggered_tracks.sort_values("time", ascending=False)
     for sid in triggered_tracks["sid"].unique():
         track = triggered_tracks[triggered_tracks["sid"] == sid]
         year = track["time"].dt.year.iloc[0]
@@ -400,7 +426,7 @@ def update_cyclone_tracks(data, adm0):
                 lat=track["lat"],
                 lon=track["lon"],
                 mode="lines+markers",
-                name=f"{track['name'].iloc[0]}<br>{year}",
+                name=f"{track['name'].iloc[0].capitalize()} {year}",
                 hoverinfo="skip",
                 customdata=track[["wmo_wind", "time"]],
                 hovertemplate=(
@@ -409,6 +435,16 @@ def update_cyclone_tracks(data, adm0):
                 ),
             )
         )
+    fig.update_layout(
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="right",
+            x=0.99,
+            bgcolor="rgba(255,255,255,0.5)",
+            title="Triggered Cyclones:",
+        ),
+    )
     print_memory_usage()
     return fig
 

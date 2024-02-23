@@ -1,0 +1,1 @@
+CHD_GREEN = "#1bb580"
