@@ -16,10 +16,18 @@ GAUL0_PATH = (
     / "reference_data"
     / "gaul0_asap_v04"
 )
+EMDAT_PROC_PATH = (
+    DATA_DIR
+    / "private"
+    / "processed"
+    / "glb"
+    / "emdat"
+    / "emdat-tropicalcyclone-2000-2022-processed-sids.csv"
+)
 
 APP_DATA_DIR = Path("data")
 
-paths = [IBRACS_THRESH_PATH, IBRACS_WMO_PATH, GAUL0_PATH]
+paths = [IBRACS_THRESH_PATH, IBRACS_WMO_PATH, GAUL0_PATH, EMDAT_PROC_PATH]
 
 
 def migrate_data():
