@@ -59,16 +59,27 @@ navbar = dbc.NavbarSimple(
     dark=True,
 )
 
-disclaimer = dbc.Alert(
-    [
-        "This is an internal tool under development. "
-        "For any enquires please contact the OCHA Centre for Humanitarian "
-        "Data via Tristan Downing at ",
-        html.A("tristan.downing@un.org", href="mailto:tristan.downing@un.org"),
-        ".",
-    ],
-    color="danger",
-)
+alerts = [
+    dbc.Alert(
+        [
+            "This is an internal tool under development. "
+            "For any enquires please contact the OCHA Centre for Humanitarian "
+            "Data via Tristan Downing at ",
+            html.A("tristan.downing@un.org", href="mailto:tristan.downing@un.org"),
+            ".",
+        ],
+        color="danger",
+    ),
+    dbc.Alert(
+        [
+            "Known issue: for countries near the antimeridian (180° W or E), "
+            "certain cyclones may be erroneously excluded, resulting in a "
+            "less frequent return period."
+        ],
+        color="warning",
+        dismissable=True,
+    ),
+]
 
 intro_text = """
 When determining the return period of tropical cyclones for a certain country,
@@ -115,6 +126,22 @@ methodology = html.Div(
                 "result in overestimating the distance, particularly for "
                 "small countries, and when the cyclone is relatively close.",
             ],
+        ),
+        html.P(
+            [
+                "The maximum sustained wind speed used for triggering "
+                "and shown in the plot is from the official WMO agency for "
+                "the basin in which the cyclone occurred. Note that "
+                "different agencies use different wind speed averaging "
+                "periods. For more information, and conversion from wind "
+                "speed to Category, see ",
+                html.A(
+                    "here",
+                    href="https://en.wikipedia.org/wiki/Tropical_cyclone_scales",
+                    target="_blank",
+                ),
+                ".",
+            ]
         ),
     ],
     style={"color": "grey", "font-size": "0.8rem"},
@@ -164,7 +191,7 @@ adm0_input = dbc.InputGroup(
 
 speed_input = html.Div(
     [
-        html.Label("Maximum 1-min sustained wind speed (knots)"),
+        html.Label("Maximum sustained wind speed (knots)"),
         dcc.Slider(
             id="speed-input",
             min=30,
@@ -240,7 +267,7 @@ app.layout = html.Div(
         navbar,
         dbc.Container(
             children=[
-                dbc.Row([dbc.Col([disclaimer])], className="mt-4"),
+                dbc.Row([dbc.Col(alerts)], className="mt-4"),
                 dbc.Row([dbc.Col([html.P(intro_text)])]),
                 dbc.Row(
                     children=[
@@ -355,6 +382,13 @@ def update_cyclone_tracks(data, adm0):
         center={"lat": (lat_max + lat_min) / 2, "lon": (lon_max + lon_min) / 2},
         opacity=0.5,
     )
+    fig.update_layout(
+        mapbox_style="open-street-map",
+        autosize=True,
+        hovermode="closest",
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+    )
     if triggered_tracks.empty:
         return fig
     triggered_tracks["time"] = pd.to_datetime(triggered_tracks["time"])
@@ -375,13 +409,6 @@ def update_cyclone_tracks(data, adm0):
                 ),
             )
         )
-    fig.update_layout(
-        mapbox_style="open-street-map",
-        autosize=True,
-        hovermode="closest",
-        showlegend=False,
-        margin=dict(l=0, r=0, t=0, b=0),
-    )
     print_memory_usage()
     return fig
 
