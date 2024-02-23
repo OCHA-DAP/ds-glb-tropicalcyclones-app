@@ -4,11 +4,17 @@ import dash_bootstrap_components as dbc
 import geopandas as gpd
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, dcc, html
+from dash import Dash, Input, Output, State, dcc, html
 
 from constants import CHD_GREEN
 from migrate_data import APP_DATA_DIR
 from utils import calc_plotly_zoom, print_memory_usage
+
+IMPACT_PLOT_VARS = [
+    "Total Damage, Adjusted ('000 US$)",
+    "Total Deaths",
+    "Total Affected",
+]
 
 print_memory_usage()
 print("Loading data...")
@@ -22,13 +28,24 @@ print("adm0s")
 adm0s = gpd.read_file(APP_DATA_DIR / "gaul0_asap_v04" / "gaul0_asap.shp")
 print_memory_usage()
 adm0s = adm0s.sort_values("name0")
+print("emdat")
+damage = pd.read_csv(
+    APP_DATA_DIR / "emdat-tropicalcyclone-2000-2022-processed-sids.csv"
+)
+print(damage)
 
 print("Processing data...")
 print("cyclones")
 cyclones = tracks.groupby("sid").first()
 cyclones["year"] = cyclones["time"].dt.year
 cyclones["name"] = cyclones["name"].str.title()
+cyclones["nameyear"] = cyclones.apply(
+    lambda row: f'{row["name"].capitalize()} {row["year"]}', axis=1
+)
 cyclones = cyclones.reset_index()
+print("emdat")
+damage["sid"] = damage["sid"].fillna("")
+damage = damage.merge(cyclones[["sid", "nameyear"]], on="sid", how="left")
 
 print_memory_usage()
 print("thresholds")
@@ -111,7 +128,13 @@ data_sources = html.Div(
                     href="https://data.apps.fao.org/map/catalog/static/search?keyword=HiH_boundaries",
                     target="_blank",
                 ),
-                " dataset.",
+                " dataset. Impact data is from the ",
+                html.A(
+                    "EM-DAT database",
+                    href="https://public.emdat.be/data",
+                    target="_blank",
+                ),
+                ".",
             ],
         ),
     ],
@@ -280,6 +303,64 @@ cyclone_tracks_display = html.Div(
     ],
 )
 
+impact_data_text = html.Div(
+    [
+        html.H3("Impact data"),
+        html.P(
+            "The plot to the right indicates the historical impact of "
+            "cyclones on the country. This can be used to determine how "
+            "effective the chosen threshold is at capturing high-impact "
+            "cyclones. Recall that the trigger in this app is based only "
+            "on wind speed and distance, so does not consider other "
+            "potentially important factors that can contribute to the "
+            "cyclone's impact."
+        ),
+    ]
+)
+
+impact_data_disclaimer = html.Div(
+    [
+        html.P(
+            [
+                "Data is from the ",
+                html.A(
+                    "EM-DAT database",
+                    href="https://public.emdat.be/data",
+                    target="_blank",
+                ),
+                ", which indicates that ",
+                html.I('"Pre-2000 data is particularly subject to reporting biases."'),
+                ", hence its exclusion from this analysis.",
+            ]
+        )
+    ],
+    style={"color": "grey", "font-size": "0.8rem"},
+    className="mt-3",
+)
+
+impact_data_var_input = dbc.InputGroup(
+    [
+        dbc.InputGroupText("Impact metric"),
+        dbc.Select(
+            id="impact-data-var-input",
+            value="Total Deaths",
+            options=[
+                {
+                    "label": x,
+                    "value": x,
+                }
+                for x in IMPACT_PLOT_VARS
+            ],
+        ),
+    ]
+)
+
+impact_data_plot = dcc.Graph(
+    id="impact-data-plot",
+    style={"height": "700px"},
+    config={"displayModeBar": False},
+)
+
 app.layout = html.Div(
     children=[
         navbar,
@@ -313,6 +394,20 @@ app.layout = html.Div(
                             ],
                             width=10,
                         ),
+                    ],
+                    className="my-4",
+                ),
+                dbc.Row(
+                    children=[
+                        dbc.Col(
+                            [
+                                impact_data_text,
+                                impact_data_var_input,
+                                impact_data_disclaimer,
+                            ],
+                            width=4,
+                        ),
+                        dbc.Col(impact_data_plot, width=8),
                     ],
                     className="mt-4",
                 ),
@@ -447,6 +542,17 @@ def update_cyclone_tracks(data, adm0):
     )
     print_memory_usage()
     return fig
+
+
+@app.callback(
+    Output("impact-data-plot", "figure"),
+    Input("adm0-cyclones", "data"),
+    Input("impact-data-var-input", "value"),
+    State("adm0-input", "value"),
+)
+def update_impact_plot(data, plot_var, adm0):
+    damage_f = damage[damage["asap0_id"] == int(adm0)]
+    print(damage_f)
 
 
 if __name__ == "__main__":
