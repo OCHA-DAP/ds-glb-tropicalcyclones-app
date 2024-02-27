@@ -2,6 +2,7 @@ import json
 
 import dash_bootstrap_components as dbc
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, dcc, html
@@ -32,7 +33,6 @@ print("emdat")
 damage = pd.read_csv(
     APP_DATA_DIR / "emdat-tropicalcyclone-2000-2022-processed-sids.csv"
 )
-print(damage)
 
 print("Processing data...")
 print("cyclones")
@@ -43,9 +43,11 @@ cyclones["nameyear"] = cyclones.apply(
     lambda row: f'{row["name"].capitalize()} {row["year"]}', axis=1
 )
 cyclones = cyclones.reset_index()
+MAX_YEAR = cyclones["year"].max()
+
 print("emdat")
 damage["sid"] = damage["sid"].fillna("")
-damage = damage.merge(cyclones[["sid", "nameyear"]], on="sid", how="left")
+damage = damage.merge(cyclones[["sid", "nameyear", "year"]], on="sid", how="left")
 
 print_memory_usage()
 print("thresholds")
@@ -313,7 +315,7 @@ impact_data_text = html.Div(
             "cyclones. Recall that the trigger in this app is based only "
             "on wind speed and distance, so does not consider other "
             "potentially important factors that can contribute to the "
-            "cyclone's impact."
+            "cyclone's impact. Cyclones without impact data are not shown."
         ),
     ]
 )
@@ -460,12 +462,15 @@ def update_return_period(data):
     print("Updating return period...")
     df_country = pd.DataFrame(data)
     if df_country.empty:
-        return "No cyclones triggered", "No cyclones in range", []
+        return "No cyclones triggered", "No cyclones in range"  # , []
     df_triggered = df_country[df_country["triggered"]]
-    n_years = df_country["year"].max() - df_country["year"].min() + 1
-    min_year = df_country["year"].min()
+    min_year_country = df_country["year"].min()
+    n_years = MAX_YEAR - min_year_country + 1
+
     # df_dict = df_triggered.to_dict("records")
-    description = f"based on {n_years} years with cyclone data, since {min_year}"
+    description = (
+        f"based on {n_years} years with cyclone data, since {min_year_country}"
+    )
     print_memory_usage()
     if df_triggered.empty:
         return "No cyclones triggered", description  # , df_dict
@@ -549,10 +554,85 @@ def update_cyclone_tracks(data, adm0):
     Input("adm0-cyclones", "data"),
     Input("impact-data-var-input", "value"),
     State("adm0-input", "value"),
+    State("year-input", "value"),
+    State("distance-input", "value"),
+    State("speed-input", "value"),
 )
-def update_impact_plot(data, plot_var, adm0):
-    damage_f = damage[damage["asap0_id"] == int(adm0)]
-    print(damage_f)
+def update_impact_plot(data, plot_col, adm0, year, distance, speed):
+    print("Updating impact plot...")
+    min_year = max(int(year), 2000)
+    df_country = pd.DataFrame(data)
+    country_name = adm0s[adm0s["asap0_id"] == int(adm0)]["name0"].iloc[0]
+    fig = go.Figure()
+    fig.update_layout(
+        title=(
+            f"Cyclone Impact: '{plot_col}'<br>"
+            f"<sup>{country_name}, impact data since {min_year}; "
+            f"Triggering for <i>wind speed ≥ {speed} knots</i> while "
+            f"<i>distance ≤ {distance} km</i></sup>"
+        ),
+        yaxis_title=plot_col,
+        barmode="group",
+        height=600,
+        template="simple_white",
+        legend=dict(
+            x=0,
+            y=1,
+            xanchor="left",
+            yanchor="top",
+            itemclick=False,
+            itemdoubleclick=False,
+        ),
+        margin=dict(t=60),
+        hovermode="x",
+    )
+    damage_f = damage[(damage["asap0_id"] == int(adm0)) & (damage["year"] >= min_year)]
+    if damage_f.empty:
+        fig.add_annotation(
+            text=f"<i>No impact data available for {country_name} since {min_year}</i>",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(color="grey"),
+            xref="paper",
+            yref="paper",
+            xanchor="center",
+            yanchor="middle",
+        )
+        return fig
+    triggered = df_country.groupby("sid")["triggered"].any().reset_index()
+    damage_f = damage_f.merge(triggered, on="sid", how="left")
+
+    df_plot = damage_f.copy()
+    df_plot = df_plot[df_plot[plot_col] > 0].sort_values(plot_col)
+    df_plot["color"] = df_plot["triggered"].map(
+        {True: "red", False: "blue", np.nan: "grey"}
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=df_plot["nameyear"],
+            y=df_plot[plot_col],
+            hovertemplate="%{y:,.0f}",
+            marker_color=df_plot["color"],
+            showlegend=False,
+            name="",
+        )
+    )
+
+    for legend_name, color in zip(
+        ["Triggered", "Not Triggered", "No Track Data"], ["red", "blue", "grey"]
+    ):
+        fig.add_trace(go.Bar(x=[None], y=[None], marker_color=color, name=legend_name))
+
+    fig.update_layout(
+        xaxis=dict(
+            tickmode="array",
+            tickvals=df_plot["nameyear"].values,
+            title="Cyclone",
+        ),
+    )
+    return fig
 
 
 if __name__ == "__main__":
