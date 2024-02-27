@@ -357,10 +357,13 @@ impact_data_var_input = dbc.InputGroup(
     ]
 )
 
-impact_data_plot = dcc.Graph(
-    id="impact-data-plot",
-    style={"height": "700px"},
-    config={"displayModeBar": False},
+impact_data_plot = dcc.Loading(
+    dcc.Graph(
+        id="impact-data-plot",
+        style={"height": "700px"},
+        config={"displayModeBar": False},
+    ),
+    parent_className="loading_wrapper",
 )
 
 app.layout = html.Div(
