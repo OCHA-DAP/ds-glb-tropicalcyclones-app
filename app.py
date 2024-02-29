@@ -16,6 +16,10 @@ IMPACT_PLOT_VARS = [
     "Total Deaths",
     "Total Affected",
 ]
+# Haiti
+DEFAULT_ASAP0_ID = 68
+DEFAULT_START_YEAR = 1980
+DEFAULT_IMPACT_PLOT_VAR = "Total Affected"
 
 print_memory_usage()
 print("Loading data...")
@@ -213,7 +217,7 @@ adm0_input = dbc.InputGroup(
         dbc.InputGroupText("Country"),
         dbc.Select(
             id="adm0-input",
-            value=116,
+            value=DEFAULT_ASAP0_ID,
             options=[
                 {
                     "label": row["name0"],
@@ -260,7 +264,7 @@ year_input = dbc.InputGroup(
         dbc.InputGroupText("Since year"),
         dbc.Select(
             id="year-input",
-            value=1970,
+            value=DEFAULT_START_YEAR,
             options=[
                 {
                     "label": x,
@@ -345,7 +349,7 @@ impact_data_var_input = dbc.InputGroup(
         dbc.InputGroupText("Impact metric"),
         dbc.Select(
             id="impact-data-var-input",
-            value="Total Deaths",
+            value=DEFAULT_IMPACT_PLOT_VAR,
             options=[
                 {
                     "label": x,
