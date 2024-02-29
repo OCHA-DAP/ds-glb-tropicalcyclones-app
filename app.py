@@ -106,6 +106,15 @@ alerts = [
         color="warning",
         dismissable=True,
     ),
+    dbc.Alert(
+        [
+            "Known issue: some cyclones from 2022 are excluded as their best "
+            "tracks have not yet been validated by the WMO. This will result "
+            "in a less frequent return period."
+        ],
+        color="warning",
+        dismissable=True,
+    ),
 ]
 
 intro_text = """
