@@ -1,4 +1,4 @@
-Country,Allocation date,Amount in US$,Window,Emergency,Status,iso2,asap0_id,year,sid
+Country,Allocation date,Amount in US$,Window,Emergency,Status,iso2,asap0_id,allocation_year,sid
 Antigua and Barbuda,2017-10-04,2154461,Rapid Response,Storm,Report Available,AG,64,2017,2017242N16333
 Bahamas,2019-09-26,1002151,Rapid Response,Storm,Report Available,BS,76,2019,2019236N10314
 Bangladesh,2023-06-14,3000000,Rapid Response,Storm,Completed,BD,20,2023,
@@ -31,9 +31,9 @@ Guatemala,2010-06-15,3376068,Rapid Response,Storm,Report Available,GT,117,2010,2
 Haiti,2016-12-21,3544711,Rapid Response,Storm,Report Available,HT,68,2016,2016273N13300
 Haiti,2016-10-19,6838529,Rapid Response,Storm,Report Available,HT,68,2016,2016273N13300
 Haiti,2012-11-26,3947974,Rapid Response,Storm,Report Available,HT,68,2012,2012296N14283
-Haiti,2008-12-23,1000001,Rapid Response,Storm,Report Available,HT,68,2008,2008241N19303
-Haiti,2008-11-28,4076743,Rapid Response,Storm,Report Available,HT,68,2008,2008241N19303
-Haiti,2008-09-29,5106424,Rapid Response,Storm,Report Available,HT,68,2008,2008241N19303
+Haiti,2008-12-23,1000001,Rapid Response,Storm,Report Available,HT,68,2008,2008245N17323
+Haiti,2008-11-28,4076743,Rapid Response,Storm,Report Available,HT,68,2008,2008245N17323
+Haiti,2008-09-29,5106424,Rapid Response,Storm,Report Available,HT,68,2008,2008245N17323
 Haiti,2006-06-06,1000000,Underfunded Emergencies,Storm,Report Available,HT,68,2006,
 Honduras,2020-12-09,3901926,Rapid Response,Storm,Report Available,HN,100,2020,2020306N15288
 Lao People's Democratic Republic,2009-10-21,3828517,Rapid Response,Storm,Report Available,LA,41,2009,2009268N14128

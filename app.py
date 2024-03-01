@@ -37,6 +37,8 @@ print("emdat")
 damage = pd.read_csv(
     APP_DATA_DIR / "emdat-tropicalcyclone-2000-2022-processed-sids.csv"
 )
+print("cerf")
+cerf = pd.read_csv(APP_DATA_DIR / "cerf-storms-with-sids-2024-02-27.csv")
 
 print("Processing data...")
 print("cyclones")
@@ -53,11 +55,13 @@ print("emdat")
 damage["sid"] = damage["sid"].fillna("")
 damage = damage.merge(cyclones[["sid", "nameyear", "year"]], on="sid", how="left")
 
+print("cerf")
+cerf["sid"] = cerf["sid"].fillna("")
+cerf = cerf.merge(cyclones[["sid", "nameyear", "year"]], on="sid", how="left")
+
 print_memory_usage()
 print("thresholds")
 thresholds = thresholds.merge(cyclones[["sid", "year", "name"]], on="sid")
-print("thresholds dtypes:")
-print(thresholds.dtypes)
 
 adm0s = adm0s[adm0s["asap0_id"].isin(thresholds["asap0_id"].unique())]
 
@@ -149,6 +153,12 @@ data_sources = html.Div(
                     href="https://public.emdat.be/data",
                     target="_blank",
                 ),
+                ". CERF allocation data is from the ",
+                html.A(
+                    "CERF Allocation Summaries page",
+                    href="https://cerf.un.org/what-we-do/allocation-summaries",
+                    target="_blank",
+                ),
                 ".",
             ],
         ),
@@ -190,6 +200,14 @@ methodology = html.Div(
                 "Cyclone track data only goes up to 2022, inclusive. More "
                 "recent tracks will be added once the WMO endorses the best "
                 "track data and it is updated in IBTrACS."
+            ]
+        ),
+        html.P(
+            [
+                "CERF allocation data was matched to cyclones from IBTrACS "
+                "based on CERF allocation reports for allocations with the "
+                "'Emergency' type 'Storm'. It is possible some allocations "
+                "have been missed or misattributed."
             ]
         ),
     ],
@@ -379,6 +397,47 @@ impact_data_plot = dcc.Loading(
     parent_className="loading_wrapper",
 )
 
+cerf_data_text = html.Div(
+    [
+        html.H3("CERF allocations"),
+        html.P(
+            [
+                "The plot to the right shows the allocations made by the ",
+                html.A(
+                    "Central Emergency Response Fund",
+                    href="https://cerf.un.org/",
+                    target="_blank",
+                ),
+                " (CERF) for cyclones that have affected the country.",
+            ]
+        ),
+    ]
+)
+
+cerf_data_disclaimer = html.Div(
+    [
+        html.P(
+            [
+                "Allocations made for multiple cyclones have been attributed "
+                "here to the single cyclone with the highest impact. "
+                "The year in this plot is the year the cyclone started, not "
+                "the year the allocation was made.",
+            ]
+        )
+    ],
+    style={"color": "grey", "font-size": "0.8rem"},
+    className="mt-3",
+)
+
+cerf_data_plot = dcc.Loading(
+    dcc.Graph(
+        id="cerf-data-plot",
+        style={"height": "700px"},
+        config={"displayModeBar": False},
+    ),
+    parent_className="loading_wrapper",
+)
+
 app.layout = html.Div(
     children=[
         navbar,
@@ -426,6 +485,16 @@ app.layout = html.Div(
                             width=4,
                         ),
                         dbc.Col(impact_data_plot, width=8),
+                    ],
+                    className="mt-4",
+                ),
+                dbc.Row(
+                    children=[
+                        dbc.Col(
+                            [cerf_data_text, cerf_data_disclaimer],
+                            width=4,
+                        ),
+                        dbc.Col(cerf_data_plot, width=8),
                     ],
                     className="mt-4",
                 ),
@@ -599,7 +668,7 @@ def update_impact_plot(data, plot_col, adm0, year, distance, speed):
             itemclick=False,
             itemdoubleclick=False,
         ),
-        margin=dict(t=60),
+        margin=dict(t=60, r=0, b=0),
         hovermode="x",
     )
     damage_f = damage[(damage["asap0_id"] == int(adm0)) & (damage["year"] >= min_year)]
@@ -630,6 +699,93 @@ def update_impact_plot(data, plot_col, adm0, year, distance, speed):
             x=df_plot["nameyear"],
             y=df_plot[plot_col],
             hovertemplate="%{y:,.0f}",
+            marker_color=df_plot["color"],
+            showlegend=False,
+            name="",
+        )
+    )
+
+    for legend_name, color in zip(
+        ["Triggered", "Not Triggered", "No Track Data"], ["red", "blue", "grey"]
+    ):
+        fig.add_trace(go.Bar(x=[None], y=[None], marker_color=color, name=legend_name))
+
+    fig.update_layout(
+        xaxis=dict(
+            tickmode="array",
+            tickvals=df_plot["nameyear"].values,
+            title="Cyclone",
+        ),
+    )
+    return fig
+
+
+@app.callback(
+    Output("cerf-data-plot", "figure"),
+    Input("adm0-cyclones", "data"),
+    State("adm0-input", "value"),
+    State("year-input", "value"),
+    State("distance-input", "value"),
+    State("speed-input", "value"),
+)
+def update_cerf_plot(data, adm0, year, distance, speed):
+    print("Updating CERF plot...")
+    plot_col = "Amount in US$"
+    min_year = max(int(year), 2006)
+    df_country = pd.DataFrame(data)
+    country_name = adm0s[adm0s["asap0_id"] == int(adm0)]["name0"].iloc[0]
+    fig = go.Figure()
+    fig.update_layout(
+        title=(
+            f"CERF Allocations<br>"
+            f"<sup>{country_name}, CERF data since {min_year}; "
+            f"Triggering for <i>wind speed ≥ {speed} knots</i> while "
+            f"<i>distance ≤ {distance} km</i></sup>"
+        ),
+        yaxis_title=plot_col,
+        barmode="stack",
+        height=600,
+        template="simple_white",
+        legend=dict(
+            x=0,
+            y=1,
+            xanchor="left",
+            yanchor="top",
+            itemclick=False,
+            itemdoubleclick=False,
+        ),
+        margin=dict(t=60, r=0, b=0),
+    )
+    cerf_f = cerf[(cerf["asap0_id"] == int(adm0)) & (cerf["year"] >= min_year)]
+    if cerf_f.empty:
+        fig.add_annotation(
+            text=f"<i>No CERF allocations for Storms in {country_name} since {min_year}</i>",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(color="grey"),
+            xref="paper",
+            yref="paper",
+            xanchor="center",
+            yanchor="middle",
+        )
+        return fig
+    triggered = df_country.groupby("sid")["triggered"].any().reset_index()
+    cerf_f = cerf_f.merge(triggered, on="sid", how="left")
+    cerf_f["total_allocation"] = cerf_f.groupby("sid")[plot_col].transform("sum")
+
+    df_plot = cerf_f.copy()
+    df_plot = df_plot[df_plot[plot_col] > 0].sort_values("total_allocation")
+    df_plot["color"] = df_plot["triggered"].map(
+        {True: "red", False: "blue", np.nan: "grey"}
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=df_plot["nameyear"],
+            y=df_plot[plot_col],
+            customdata=df_plot[["Allocation date"]],
+            hovertemplate="Allocation date: %{customdata[0]}<br>Amount: $%{y:,.0f}",
             marker_color=df_plot["color"],
             showlegend=False,
             name="",
