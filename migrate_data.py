@@ -24,10 +24,24 @@ EMDAT_PROC_PATH = (
     / "emdat"
     / "emdat-tropicalcyclone-2000-2022-processed-sids.csv"
 )
+CERF_PROC_PATH = (
+    OLD_DATA_DIR
+    / "public"
+    / "processed"
+    / "glb"
+    / "cerf"
+    / "cerf-storms-with-sids-2024-02-27.csv"
+)
 
 APP_DATA_DIR = Path("data")
 
-paths = [IBRACS_THRESH_PATH, IBRACS_WMO_PATH, GAUL0_PATH, EMDAT_PROC_PATH]
+paths = [
+    IBRACS_THRESH_PATH,
+    IBRACS_WMO_PATH,
+    GAUL0_PATH,
+    EMDAT_PROC_PATH,
+    CERF_PROC_PATH,
+]
 
 
 def migrate_data():
